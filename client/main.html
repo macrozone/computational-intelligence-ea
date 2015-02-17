@@ -1,0 +1,54 @@
+
+<template name="main">
+	{{>tools}}
+	<div class="container population">
+		{{#each population}}
+			{{>oneThing}}
+		{{/each}}
+
+	</div>
+</template>
+
+<template name="tools">
+	<div class="panel panel-default tools">
+		<div class="panel-body">
+			<button class="btn btn-danger btn-reset">Init / Reset</button>
+			<button class="btn btn-default btn-selectRangBased">Select Rang based</button>
+			<button class="btn btn-mutate">Mutate all</button>
+			min-g: <input type="number" placeholder="min-g" class="min-g" value="{{minG}}" />
+			{{>widgetSinglePointRecombination}}
+		</div>
+	</div>
+</template>
+
+<template name="widgetSinglePointRecombination">
+
+		{{>selectThing class="thing1" population=population}}
+		{{>selectThing class="thing2" population=population}}
+		<button class="btn btn-warning btn-recombine">Recombine</button>
+
+</template>
+
+<template name="selectThing">
+	<select class="{{class}}">
+		{{#each population}}
+		<option value="{{_id}}">{{_id}}</option>
+		{{/each}}
+	</select>
+</template>
+
+<template name="oneThing">
+
+
+	<div class="col-xs-6">
+		<table class="table {{#unless valid}}invalid{{/unless}}">
+			<tr><th>ID</th><td>{{_id}}</td></tr>
+			<tr><th>bits</th><td class="bits">{{bitString}}
+			</td></tr>
+			<tr><th>d</th><td>{{decodeValue bits "d"}}</td></tr>
+			<tr><th>h</th><td>{{decodeValue bits "h"}}</td></tr>
+			<tr><th>fitness</th><td>{{fitness bits}}</td></tr>
+			<tr><th class="g">g</th><td>{{g bits}}</td></tr>
+		</table>
+	</div>
+</template>
