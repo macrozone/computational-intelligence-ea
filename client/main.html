@@ -1,22 +1,39 @@
 
 <template name="main">
 	{{>tools}}
-	<div class="container population">
+	<div class="main">
+	<div class="population col-xs-7">
 		{{#each population}}
 			{{>oneThing}}
 		{{/each}}
 
 	</div>
+	<div class="stats col-xs-5">
+	{{>stats}}
+	</div>
+	</div>
+</template>
+
+<template name="stats">
+<div class="bestChart"></div>
 </template>
 
 <template name="tools">
 	<div class="panel panel-default tools">
 		<div class="panel-body">
-			<button class="btn btn-danger btn-reset">Init / Reset</button>
+		<div class="group">
+			
 			<button class="btn btn-default btn-selectRangBased">Select Rang based</button>
-			<button class="btn btn-mutate">Mutate all</button>
+			<input type="number" class="p_mutation" placeholder="% mutation" value="{{p_mutation}}"/>
+			<button class="btn btn-warning btn-mutate">Mutate all</button>
+			<button class="btn btn-warning btn-recombineRandomly">Recombine randomly (10)</button>
 			min-g: <input type="number" placeholder="min-g" class="min-g" value="{{minG}}" />
 			{{>widgetSinglePointRecombination}}
+		</div>
+		<div class="group">
+			<button class="btn btn-danger btn-reset">Init / Reset</button>
+			<button class="btn btn-primary btn-one-round"><i class="glyphicon glyphicon-step-forward"></i> One full step</button> <button class="btn btn-primary btn-100-rounds"><i class="glyphicon glyphicon-fast-forward"></i> 100 Steps</button> Generation: {{generation}}
+			</div>
 		</div>
 	</div>
 </template>
@@ -25,7 +42,7 @@
 
 		{{>selectThing class="thing1" population=population}}
 		{{>selectThing class="thing2" population=population}}
-		<button class="btn btn-warning btn-recombine">Recombine</button>
+		<button class="btn btn-recombine">Recombine</button>
 
 </template>
 

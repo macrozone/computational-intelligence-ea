@@ -1,12 +1,12 @@
 @Population = new Meteor.Collection null
-
+@BestList = new Meteor.Collection null
 LOWER =0
 UPPER = 31
 DELTA = 1
 
 Session.set "MIN_G", 300
-
-MUTATE_P = 0.1
+Session.set "P_MUTATION", 0.1
+Session.set "generation", 1
 N = 30
 
 
@@ -67,7 +67,6 @@ randomInt = (from, to) ->
 
 singlePointRecombination = (a,b) ->
 	cutPoint = randomInt 1, a.length-1
-	console.log "cut at #{cutPoint}"
 	a_1 = a.slice 0, cutPoint
 	a_2 = a.slice cutPoint, a.length
 
@@ -87,6 +86,8 @@ Router.route "/",
 	data: ->
 		population: -> _.sortBy Population.find().fetch(), (thing) -> fitness_b thing.bits
 		minG: -> Session.get "MIN_G"
+		p_mutation: -> Session.get "P_MUTATION"
+		generation: -> Session.get "generation"
 
 Template.oneThing.helpers
 	decodeValue: decodeValue
@@ -100,14 +101,16 @@ Template.oneThing.helpers
 	valid: ->
 		g_b(@bits) >= Session.get "MIN_G"
 
-selectRangBased = (population) ->
+
+getValidRanked = (population) ->
 	valid = []
 
 	for thing in population
-		
 		valid.push thing if g_b(thing.bits) >= Session.get "MIN_G"
 	# ranked from worst to best
-	ranked = _.sortBy valid, (thing) -> -fitness_b thing.bits
+	_.sortBy valid, (thing) -> -fitness_b thing.bits
+selectRangBased = (population) ->
+	ranked = getValidRanked population
 	length = ranked.length
 	totalRank = length*(length+1)/2
 	selected = []
@@ -133,25 +136,102 @@ Template.widgetSinglePointRecombination.events
 	'click .btn-recombine': (event, template)->
 		thing1Id = template.$(".thing1").val()
 		thing2Id = template.$(".thing2").val()
-		thing1 = Population.findOne thing1Id
-		thing2 = Population.findOne thing2Id
-		[new1, new2] = singlePointRecombination thing1.bits, thing2.bits
-		Population.update thing1Id, $set: bits: new1
-		Population.update thing2Id, $set: bits: new2
+		recombineTwo thing1Id, thing2Id
+recombineTwo = (id1, id2) ->
+	thing1 = Population.findOne id1
+	thing2 = Population.findOne id2
+	[new1, new2] = singlePointRecombination thing1.bits, thing2.bits
+	Population.update id1, $set: bits: new1
+	Population.update id2, $set: bits: new2
+
+getBestInCurrentPopulation = ->
+	ranked = getValidRanked Population.find().fetch()
+	_.last ranked
+
+
+Template.stats.rendered = ->
+	$chart = @$(".bestChart").highcharts
+		series: [
+			name: "best", data: []
+		]
+	chart = $chart.highcharts()
+	@autorun ->
+		best = BestList.find().fetch()
+		
+		data = []
+		if best?
+			data = for thing in best
+				{d,h} = decode thing.bits
+				name: "d: #{d}, h: #{h}"
+				y: fitness_b thing.bits
+	
+		chart.series[0].update data: data
+
+mutateAll = ->
+	Population.find().forEach (thing) ->
+		mutate thing.bits, Session.get "P_MUTATION"
+		Population.update thing._id, thing
+
+getRandom = (arr, n) ->
+	result = new Array(n)
+	len = arr.length
+	taken = new Array(len)
+	if n > len
+		throw new RangeError('getRandom: more elements taken than available')
+	while n--
+		x = Math.floor(Math.random() * len)
+		result[n] = arr[if x in taken then taken[x] else x]
+		taken[x] = --len
+	result
 
 
 
+recombineRandomly = ->
+	all = Population.find().fetch()
+
+	selected = getRandom all, 10
+	for i in [0..4]
+		recombineTwo selected[i*2]._id, selected[i*2+1]._id
+
+
+updateBestInPopulation = ->
+	currentBest = getBestInCurrentPopulation()
+	delete currentBest._id
+	BestList.insert currentBest
+
+doRangBasedSelection = ->
+	selectRangBased Population.find().fetch()
+	
+doOneRound = ->
+	doRangBasedSelection()
+	recombineRandomly()
+	mutateAll()
+	updateBestInPopulation()
+	generation = Session.get "generation"
+	Session.set "generation", generation+1
+doRounds = (n)->
+	for i in [1..n]
+		doOneRound()
 Template.tools.events
 	'change .min-g': (event) ->
 		val = $(event.target).val()
 		Session.set "MIN_G", val
-	'click .btn-reset': ->
+	'change .p_mutation': (event) ->
+		val = $(event.target).val()
+		Session.set "P_MUTATION", val
+	'click .btn-recombineRandomly': ->recombineRandomly
+	'click .btn-reset': (event, template) ->
+		
+		BestList.remove {}
+		Session.set "generation", 1
 		initRandom N
 
-	'click .btn-selectRangBased': ->
-		nextPopulation = selectRangBased Population.find().fetch()
-	'click .btn-mutate': ->
-		newPop = []
-		Population.find().forEach (thing) ->
-			mutate thing.bits, MUTATE_P
-			Population.update thing._id, thing
+	'click .btn-selectRangBased': doRangBasedSelection
+		
+	'click .btn-mutate': mutateAll
+		
+	'click .btn-one-round': doOneRound
+
+	'click .btn-100-rounds': -> doRounds 100
+
+
