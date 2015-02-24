@@ -5,7 +5,7 @@ UPPER = 31
 DELTA = 1
 
 Session.set "MIN_G", 300
-Session.set "P_MUTATION", 0.1
+Session.set "P_MUTATION", 0.01
 Session.set "generation", 1
 N = 30
 
