@@ -25,7 +25,12 @@ createRandomObj = (index)->
 initRandom = (number)->
 	Population.remove {}
 	Population.insert createRandomObj(i) for i in [1..number]
-initRandom N
+
+init = ->
+	BestList.remove {}
+	Session.set "generation", 1
+	initRandom N
+init()
 
 toReal = (bits, lower, upper, delta) ->
 	sum = 0
@@ -220,11 +225,9 @@ Template.tools.events
 		val = $(event.target).val()
 		Session.set "P_MUTATION", val
 	'click .btn-recombineRandomly': ->recombineRandomly
-	'click .btn-reset': (event, template) ->
-		
-		BestList.remove {}
-		Session.set "generation", 1
-		initRandom N
+	'click .btn-reset': init
+
+
 
 	'click .btn-selectRangBased': doRangBasedSelection
 		
