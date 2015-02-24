@@ -152,7 +152,7 @@ getBestInCurrentPopulation = ->
 Template.stats.rendered = ->
 	$chart = @$(".bestChart").highcharts
 		series: [
-			name: "best", data: []
+			name: "Fitness", data: []
 		]
 	chart = $chart.highcharts()
 	@autorun ->
