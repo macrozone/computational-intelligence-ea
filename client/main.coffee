@@ -5,10 +5,16 @@ UPPER = 31
 DELTA = 1
 
 Session.set "MIN_G", 300
-Session.set "P_MUTATION", 0.01
-Session.set "generation", 1
-N = 30
 
+Session.set "generation", 1
+
+
+
+exoParams = 
+	mu:7
+	kappa:15
+	lambda: 49
+	ro:3
 
 getNumBits = (lower, upper, delta) ->
 	Math.ceil(Math.log((upper-lower)/delta)/Math.LN2)
@@ -19,7 +25,9 @@ createRandomObj = (index)->
 	bits = bits.concat ((Math.random() < 0.5) for i in [0..getNumBits(LOWER,UPPER,1)-1])
 	bits = bits.concat ((Math.random() < 0.5) for i in [0..getNumBits(LOWER,UPPER,1)-1])
 	bits: bits
+	p_mutation: 0.01
 	_id: index.toString()
+	age: 0
 
 
 initRandom = (number)->
@@ -29,7 +37,7 @@ initRandom = (number)->
 init = ->
 	BestList.remove {}
 	Session.set "generation", 1
-	initRandom N
+	initRandom exoParams.mu
 init()
 
 toReal = (bits, lower, upper, delta) ->
@@ -91,7 +99,6 @@ Router.route "/",
 	data: ->
 		population: -> _.sortBy Population.find().fetch(), (thing) -> fitness_b thing.bits
 		minG: -> Session.get "MIN_G"
-		p_mutation: -> Session.get "P_MUTATION"
 		generation: -> Session.get "generation"
 
 Template.oneThing.helpers
@@ -114,7 +121,8 @@ getValidRanked = (population) ->
 		valid.push thing if g_b(thing.bits) >= Session.get "MIN_G"
 	# ranked from worst to best
 	_.sortBy valid, (thing) -> -fitness_b thing.bits
-selectRangBased = (population) ->
+selectRangBased = (population, number) ->
+	
 	ranked = getValidRanked population
 	length = ranked.length
 	totalRank = length*(length+1)/2
@@ -130,18 +138,11 @@ selectRangBased = (population) ->
 	find = (random) ->
 		for thing in ranked
 			if thing.percentCummulated >=random
+				delete thing._id
 				return thing
-	for i in [1..N]
-		next = find Math.random()
-		delete next._id
-		Population.update i.toString(), $set: bits: next.bits
+	(find Math.random() for i in [1..number])
 
 
-Template.widgetSinglePointRecombination.events
-	'click .btn-recombine': (event, template)->
-		thing1Id = template.$(".thing1").val()
-		thing2Id = template.$(".thing2").val()
-		recombineTwo thing1Id, thing2Id
 recombineTwo = (id1, id2) ->
 	thing1 = Population.findOne id1
 	thing2 = Population.findOne id2
@@ -174,7 +175,7 @@ Template.stats.rendered = ->
 
 mutateAll = ->
 	Population.find().forEach (thing) ->
-		mutate thing.bits, Session.get "P_MUTATION"
+		mutate thing.bits, thing.p_mutation
 		Population.update thing._id, thing
 
 getRandom = (arr, n) ->
@@ -191,12 +192,31 @@ getRandom = (arr, n) ->
 
 
 
-recombineRandomly = ->
+recombine10RandomlyAndSave = ->
 	all = Population.find().fetch()
 
 	selected = getRandom all, 10
 	for i in [0..4]
 		recombineTwo selected[i*2]._id, selected[i*2+1]._id
+
+# give a pool and get one new
+recombineArrayOfBits = (poolOfBits) ->
+	n = _.first(poolOfBits).length
+	nCuts = poolOfBits.length-1
+	newBits = []
+	cuts = (randomInt 0, n for i in [1..nCuts])
+	cuts = cuts.sort()
+	lastCut = 0
+	for bits,i in poolOfBits
+		from = lastCut
+		to = cuts[i] ? n
+		lastCut = to
+
+		part = bits.slice from, to 
+		
+		newBits = newBits.concat part
+	
+	newBits
 
 
 updateBestInPopulation = ->
@@ -204,16 +224,40 @@ updateBestInPopulation = ->
 	delete currentBest._id
 	BestList.insert currentBest
 
-doRangBasedSelection = ->
-	selectRangBased Population.find().fetch()
+doRangBasedSelectionAndReplaceAll = ->
+	newPopulation = selectRangBased Population.find().fetch(), exoParams.mu
 	
+	Population.remove {}
+	for thing in newPopulation
+		thing.age++
+		Population.insert thing 
+
+
+
+
+mutate_r = (r) ->
+	r * Math.exp(NormalDistributedRandomValue())
+
 doOneRound = ->
-	doRangBasedSelection()
-	recombineRandomly()
-	mutateAll()
+	population = Population.find().fetch()
+	
+	for i in [1..exoParams.lambda]
+		pool = getRandom population, exoParams.ro
+		[one] = getRandom pool, 1
+		p_mutation = one.p_mutation
+		bits = recombineArrayOfBits _.pluck pool, "bits"
+		p_mutation = mutate_r p_mutation
+		bits = mutate bits, p_mutation
+		age = 0
+		Population.insert {bits, p_mutation, age}
+
+	
+	doRangBasedSelectionAndReplaceAll()
+	
 	updateBestInPopulation()
 	generation = Session.get "generation"
 	Session.set "generation", generation+1
+
 doRounds = (n)->
 	for i in [1..n]
 		doOneRound()
@@ -221,15 +265,12 @@ Template.tools.events
 	'change .min-g': (event) ->
 		val = $(event.target).val()
 		Session.set "MIN_G", val
-	'change .p_mutation': (event) ->
-		val = $(event.target).val()
-		Session.set "P_MUTATION", val
-	'click .btn-recombineRandomly': ->recombineRandomly
+	'click .btn-recombine10Randomly': ->recombine10RandomlyAndSave
 	'click .btn-reset': init
 
 
 
-	'click .btn-selectRangBased': doRangBasedSelection
+	'click .btn-selectRangBased': doRangBasedSelectionAndReplaceAll
 		
 	'click .btn-mutate': mutateAll
 		

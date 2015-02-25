@@ -24,11 +24,11 @@
 		<div class="group">
 			
 			<button class="btn btn-default btn-selectRangBased">Select Rang based</button>
-			<input type="number" class="p_mutation" placeholder="% mutation" value="{{p_mutation}}"/>
+		
 			<button class="btn btn-warning btn-mutate">Mutate all</button>
-			<button class="btn btn-warning btn-recombineRandomly">Recombine randomly (10)</button>
+			<button class="btn btn-warning btn-recombine10Randomly">Recombine randomly (10)</button>
 			min-g: <input type="number" placeholder="min-g" class="min-g" value="{{minG}}" />
-			{{>widgetSinglePointRecombination}}
+			
 		</div>
 		<div class="group">
 			<button class="btn btn-danger btn-reset">Init / Reset</button>
@@ -38,13 +38,6 @@
 	</div>
 </template>
 
-<template name="widgetSinglePointRecombination">
-
-		{{>selectThing class="thing1" population=population}}
-		{{>selectThing class="thing2" population=population}}
-		<button class="btn btn-recombine">Recombine</button>
-
-</template>
 
 <template name="selectThing">
 	<select class="{{class}}">
@@ -60,6 +53,8 @@
 	<div class="col-xs-6">
 		<table class="table {{#unless valid}}invalid{{/unless}}">
 			<tr><th>ID</th><td>{{_id}}</td></tr>
+			<tr><th>age</th><td>{{age}}</td></tr>
+			<tr><th>p_mutation</th><td>{{p_mutation}}</td></tr>
 			<tr><th>bits</th><td class="bits">{{bitString}}
 			</td></tr>
 			<tr><th>d</th><td>{{decodeValue bits "d"}}</td></tr>
