@@ -105,6 +105,7 @@ Template.oneThing.helpers
 		string
 	valid: ->
 		g_b(@bits) >= Session.get "MIN_G"
+		true
 
 
 getValidRanked = (population) ->
@@ -114,8 +115,10 @@ getValidRanked = (population) ->
 		valid.push thing if g_b(thing.bits) >= Session.get "MIN_G"
 	# ranked from worst to best
 	_.sortBy valid, (thing) -> -fitness_b thing.bits
-selectRangBased = (population) ->
-	ranked = getValidRanked population
+
+selectRangBased = (population, number, fitnessFunction, minMax) ->
+	selection = []
+	ranked = _.sortBy population, (thing) -> fitnessFunction(thing.bits) * (if minMax is "minizize" then -1 else 1)
 	length = ranked.length
 	totalRank = length*(length+1)/2
 	selected = []
@@ -131,10 +134,11 @@ selectRangBased = (population) ->
 		for thing in ranked
 			if thing.percentCummulated >=random
 				return thing
-	for i in [1..N]
+	for i in [1..number]
 		next = find Math.random()
 		delete next._id
-		Population.update i.toString(), $set: bits: next.bits
+		selection.push next
+	selection
 
 
 Template.widgetSinglePointRecombination.events
@@ -145,9 +149,8 @@ Template.widgetSinglePointRecombination.events
 recombineTwo = (id1, id2) ->
 	thing1 = Population.findOne id1
 	thing2 = Population.findOne id2
-	[new1, new2] = singlePointRecombination thing1.bits, thing2.bits
-	Population.update id1, $set: bits: new1
-	Population.update id2, $set: bits: new2
+	return singlePointRecombination thing1.bits, thing2.bits
+	
 
 getBestInCurrentPopulation = ->
 	ranked = getValidRanked Population.find().fetch()
@@ -171,11 +174,31 @@ Template.stats.rendered = ->
 				y: fitness_b thing.bits
 	
 		chart.series[0].update data: data
+	$frontChart = @$(".frontChart").highcharts
+		chart: type: 'scatter'
+		series: [
+		]
+	frontChart = $frontChart.highcharts()
 
-mutateAll = ->
-	Population.find().forEach (thing) ->
+	@autorun ->
+		pop = Population.find().fetch()
+
+		if pop?
+			
+			data = for thing in pop
+				{d,h} = decode thing.bits
+				f = fitness_r d,h
+				g = g_r d,h
+				name: "d: #{d}, h: #{h}, f: #{f}, g: #{g}"
+				x: f
+				y: g
+			generation = Session.get "generation"
+			serie.hide() for serie in frontChart.series
+			frontChart.addSeries name: "Generation #{generation}", data: data
+mutateAll = (population) ->
+	for thing in population
 		mutate thing.bits, Session.get "P_MUTATION"
-		Population.update thing._id, thing
+		
 
 getRandom = (arr, n) ->
 	result = new Array(n)
@@ -191,12 +214,13 @@ getRandom = (arr, n) ->
 
 
 
-recombineRandomly = ->
-	all = Population.find().fetch()
-
-	selected = getRandom all, 10
+recombineRandomly = (population)->
+	
+	# recombine 10
+	population = _.shuffle population
 	for i in [0..4]
-		recombineTwo selected[i*2]._id, selected[i*2+1]._id
+		[population[i*2].bits, population[i*2+1].bits] = singlePointRecombination population[i*2].bits, population[i*2+1].bits
+	return population
 
 
 updateBestInPopulation = ->
@@ -208,9 +232,20 @@ doRangBasedSelection = ->
 	selectRangBased Population.find().fetch()
 	
 doOneRound = ->
-	doRangBasedSelection()
-	recombineRandomly()
-	mutateAll()
+	population = _.shuffle Population.find().fetch()
+	pool1 = population[..14]
+	pool2 = population[15..]
+	
+
+
+	pool1 = selectRangBased pool1, 15, fitness_b, "minizize"
+	pool2 = selectRangBased pool2, 15, g_b, "maximize"
+	population = pool1.concat pool2
+	population = recombineRandomly population
+	mutateAll population
+	Population.remove {}
+	for thing in population
+		Population.insert thing
 	updateBestInPopulation()
 	generation = Session.get "generation"
 	Session.set "generation", generation+1
