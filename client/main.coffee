@@ -159,6 +159,7 @@ getBestInCurrentPopulation = ->
 
 Template.stats.rendered = ->
 	$chart = @$(".bestChart").highcharts
+		chart: height: 500
 		series: [
 			name: "Fitness", data: []
 		]
@@ -175,7 +176,9 @@ Template.stats.rendered = ->
 	
 		chart.series[0].update data: data
 	$frontChart = @$(".frontChart").highcharts
-		chart: type: 'scatter'
+		chart: 
+			type: 'scatter'
+			height: 500
 		series: [
 		]
 	frontChart = $frontChart.highcharts()
